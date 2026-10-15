@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: abd_task3_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./init/postgres:/docker-entrypoint-initdb.d:ro
+      - ./sql:/sql:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d dwh" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mongo:
+    image: mongo:7
+    container_name: abd_task3_mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo
+      MONGO_INITDB_ROOT_PASSWORD: mongo
+      MONGO_INITDB_DATABASE: delivery
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongo:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: [ "CMD", "mongosh", "--quiet", "-u", "mongo", "-p", "mongo", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  airflow:
+    image: apache/airflow:2.10.5-python3.11
+    container_name: abd_task3_airflow
+    command: standalone
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      _PIP_ADDITIONAL_REQUIREMENTS: "pymongo==4.10.1"
+      AIRFLOW_CONN_PG_SOURCE: "postgresql://postgres:postgres@postgres:5432/source"
+      AIRFLOW_CONN_PG_DWH: "postgresql://postgres:postgres@postgres:5432/dwh"
+      AIRFLOW_VAR_MONGO_URI: "mongodb://mongo:mongo@mongo:27017/delivery?authSource=admin"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
