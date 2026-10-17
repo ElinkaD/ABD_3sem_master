@@ -8,6 +8,9 @@
 --
 -- Статусы заказа: 'created', 'in progress', 'delivery', 'done'.
 
+DROP TABLE IF EXISTS wrk.customer_report;
+
+CREATE TABLE wrk.customer_report AS
 WITH all_orders AS (
     -- источник 1
     SELECT oc.order_id,

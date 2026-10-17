@@ -33,11 +33,13 @@ SAVE_SETTINGS = """
 
 
 @dag(
+    dag_id='stg.LOAD_MONGO',
     schedule='*/15 * * * *',
+    max_active_runs=1,
     start_date=pendulum.datetime(2026, 10, 1, tz='UTC'),
     catchup=False,
     is_paused_upon_creation=False,
-    tags=['task3'],
+    tags=['lab1', 'task3', 'external', 'stg'],
 )
 def stg_mongo():
     @task

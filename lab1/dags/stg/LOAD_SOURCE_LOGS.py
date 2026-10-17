@@ -57,11 +57,13 @@ def apply_log(cur, object_type, object_id, operation, payload):
 
 
 @dag(
+    dag_id='stg.LOAD_SOURCE_LOGS',
     schedule='*/15 * * * *',
+    max_active_runs=1,
     start_date=pendulum.datetime(2026, 10, 1, tz='UTC'),
     catchup=False,
     is_paused_upon_creation=False,
-    tags=['task3'],
+    tags=['lab1', 'task3', 'external', 'stg'],
 )
 def stg_source_logs():
     @task
