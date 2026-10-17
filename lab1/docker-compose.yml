@@ -1,0 +1,92 @@
+name: abd_3sem_master
+
+x-pg-client: &pg-client
+  PGHOST: postgres
+  PGDATABASE: craft_market
+  PGUSER: ${POSTGRES_USER:-user}
+  PGPASSWORD: ${POSTGRES_PASSWORD:-12345}
+  PGCONNECT_TIMEOUT: 10
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: craft_market
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-12345}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./models:/models:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d craft_market']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  db-bootstrap:
+    image: postgres:17-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: *pg-client
+    volumes:
+      - ./docker/postgres:/bootstrap:ro
+      - ./data/schemas:/schemas:ro
+      - ./data/seeds/postgres:/seeds:ro
+    command: [sh, /bootstrap/bootstrap.sh]
+    restart: "no"
+
+  mongo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo
+      MONGO_INITDB_ROOT_PASSWORD: mongo
+      MONGO_INITDB_DATABASE: delivery
+    volumes:
+      - mongo_data:/data/db
+      - ./data/seeds/mongo:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: [CMD, mongosh, --quiet, -u, mongo, -p, mongo, --eval, "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  airflow:
+    build: ./docker/airflow
+    image: abd-lab1-airflow:2.10.5
+    command: standalone
+    depends_on:
+      db-bootstrap:
+        condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: UTC
+      AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: Europe/Moscow
+      AIRFLOW_CONN_PG_DWH: '{"conn_type":"postgres","host":"postgres","login":"${POSTGRES_USER:-user}","password":"${POSTGRES_PASSWORD:-12345}","schema":"craft_market","port":5432}'
+      AIRFLOW_CONN_PG_SOURCE: '{"conn_type":"postgres","host":"postgres","login":"${POSTGRES_USER:-user}","password":"${POSTGRES_PASSWORD:-12345}","schema":"source","port":5432}'
+      AIRFLOW_VAR_MONGO_URI: mongodb://mongo:mongo@mongo:27017/delivery?authSource=admin
+    ports:
+      - "127.0.0.1:${AIRFLOW_PORT:-8081}:8080"
+    volumes:
+      - airflow_data:/opt/airflow
+      - ./dags:/opt/airflow/dags:ro
+      - ./models:/opt/airflow/models:ro
+      - ./data/schemas:/opt/airflow/schemas:ro
+      - ./data/external_source:/data:ro
+    healthcheck:
+      test: [CMD-SHELL, "curl --fail --silent http://localhost:8080/health | python -c 'import json,sys; h=json.load(sys.stdin); sys.exit(any(h[k][\"status\"] != \"healthy\" for k in (\"metadatabase\", \"scheduler\")))'"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  postgres_data:
+  airflow_data:
+  mongo_data:

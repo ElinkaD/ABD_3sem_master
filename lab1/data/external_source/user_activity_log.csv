@@ -1,0 +1,6 @@
+Id,uniq_id,date_time,action_id,customer_id,quantity
+1,activity-001,2026-10-01 09:50:00,view,101,1
+2,activity-002,2026-10-01 09:50:00,cart,101,2
+3,activity-003,2026-10-02 11:20:00,view,102,1
+4,activity-004,2026-10-03 09:00:00,view,103,3
+5,activity-005,2026-10-03 09:10:00,purchase,103,3
